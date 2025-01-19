@@ -119,7 +119,7 @@ public class TypedValue {
     /** Identifies the end of plain integer values. */
     public static final int TYPE_LAST_INT = 0x1f;
 
-	/* ------------------------------------------------------------ */
+    /* ------------------------------------------------------------ */
 
     /** Complex data: bit location of unit information. */
     public static final int COMPLEX_UNIT_SHIFT = 0;
@@ -182,7 +182,7 @@ public class TypedValue {
      */
     public static final int COMPLEX_MANTISSA_MASK = 0xffffff;
 
-	/* ------------------------------------------------------------ */
+    /* ------------------------------------------------------------ */
 
     /**
      * {@link #TYPE_NULL} data indicating the value was not specified.
@@ -207,7 +207,7 @@ public class TypedValue {
      */
     public static final int DENSITY_NONE = 0xffff;
 
-	/* ------------------------------------------------------------ */
+    /* ------------------------------------------------------------ */
 
     /**
      * The type held by this value, as defined by the constants here. This tells
@@ -216,9 +216,10 @@ public class TypedValue {
     public int type;
 
     private static final float MANTISSA_MULT = 1.0f / (1 << TypedValue.COMPLEX_MANTISSA_SHIFT);
-    private static final float[] RADIX_MULTS = new float[] {
-        MANTISSA_MULT, 1.0f / (1 << 7) * MANTISSA_MULT,
-            1.0f / (1 << 15) * MANTISSA_MULT, 1.0f / (1 << 23) * MANTISSA_MULT };
+    private static final float[] RADIX_MULTS = {
+            MANTISSA_MULT, 1.0f / (1 << 7) * MANTISSA_MULT,
+            1.0f / (1 << 15) * MANTISSA_MULT, 1.0f / (1 << 23) * MANTISSA_MULT
+    };
 
     /**
      * Retrieve the base value from a complex data integer. This uses the
@@ -237,9 +238,10 @@ public class TypedValue {
                 & TypedValue.COMPLEX_RADIX_MASK];
     }
 
-    private static final String[] DIMENSION_UNIT_STRS = new String[] { "px",
-            "dip", "sp", "pt", "in", "mm" };
-    private static final String[] FRACTION_UNIT_STRS = new String[] { "%", "%p" };
+    private static final String[] DIMENSION_UNIT_STRS = {
+            "px", "dip", "sp", "pt", "in", "mm"
+    };
+    private static final String[] FRACTION_UNIT_STRS = { "%", "%p" };
 
     /**
      * Perform type conversion as per coerceToString on an explicitly

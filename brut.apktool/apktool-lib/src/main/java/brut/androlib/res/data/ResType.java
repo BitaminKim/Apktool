@@ -16,16 +16,18 @@
  */
 package brut.androlib.res.data;
 
-import brut.androlib.AndrolibException;
-import brut.androlib.err.UndefinedResObjectException;
+import brut.androlib.exceptions.AndrolibException;
+import brut.androlib.exceptions.UndefinedResObjectException;
+
 import java.util.*;
 
 public class ResType {
     private final ResConfigFlags mFlags;
-    private final Map<ResResSpec, ResResource> mResources = new LinkedHashMap<>();
+    private final Map<ResResSpec, ResResource> mResources;
 
     public ResType(ResConfigFlags flags) {
-        this.mFlags = flags;
+        mFlags = flags;
+        mResources = new LinkedHashMap<>();
     }
 
     public ResResource getResource(ResResSpec spec) throws AndrolibException {
