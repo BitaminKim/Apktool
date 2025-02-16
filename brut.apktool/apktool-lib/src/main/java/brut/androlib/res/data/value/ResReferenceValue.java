@@ -16,8 +16,8 @@
  */
 package brut.androlib.res.data.value;
 
-import brut.androlib.AndrolibException;
-import brut.androlib.err.UndefinedResObjectException;
+import brut.androlib.exceptions.AndrolibException;
+import brut.androlib.exceptions.UndefinedResObjectException;
 import brut.androlib.res.data.ResPackage;
 import brut.androlib.res.data.ResResSpec;
 
@@ -25,33 +25,31 @@ public class ResReferenceValue extends ResIntValue {
     private final ResPackage mPackage;
     private final boolean mTheme;
 
-    public ResReferenceValue(ResPackage package_, int value, String rawValue) {
-        this(package_, value, rawValue, false);
+    public ResReferenceValue(ResPackage pkg, int value, String rawValue) {
+        this(pkg, value, rawValue, false);
     }
 
-    public ResReferenceValue(ResPackage package_, int value, String rawValue,
-                             boolean theme) {
+    public ResReferenceValue(ResPackage pkg, int value, String rawValue, boolean theme) {
         super(value, rawValue, "reference");
-        mPackage = package_;
+        mPackage = pkg;
         mTheme = theme;
     }
 
     @Override
     protected String encodeAsResXml() throws AndrolibException {
-        if (isNull()) {
-            return "@null";
-        }
-
-        ResResSpec spec = getReferent();
+        ResResSpec spec = !isNull() ? getReferent() : null;
         if (spec == null) {
             return "@null";
         }
-        boolean newId = spec.hasDefaultResource() && spec.getDefaultResource().getValue() instanceof ResIdValue;
 
-        // generate the beginning to fix @android
-        String mStart = (mTheme ? '?' : '@') + (newId ? "+" : "");
+        String prefix = mTheme ? "?" : "@";
+        boolean excludeType = mTheme && spec.getType().getName().equals("attr");
 
-        return mStart + spec.getFullName(mPackage, mTheme && spec.getType().getName().equals("attr"));
+        return prefix + spec.getFullName(mPackage, excludeType);
+    }
+
+    public ResPackage getPackage() {
+        return mPackage;
     }
 
     public ResResSpec getReferent() throws AndrolibException {

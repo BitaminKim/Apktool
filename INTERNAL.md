@@ -4,27 +4,17 @@ The steps taken for slicing an official release of Apktool.
 
 ### Ensuring proper license headers
 
-Before we build a release, its a good practice to ensure all headers in source files contain
-proper licenses.
-
-    ./gradlew licenseMain && ./gradlew licenseTest
-
-If any license violations were found you can automatically fix them with either
-
-    ./gradlew licenseFormatMain
-    ./gradlew licenseFormatTest
-
-Like described, one formats the `src/main` directory, while the other formats the `src/test` directory.
+_Currently broken after movement to kotlin dsl._
 
 ### Tagging the release.
 
 Inside `build.gradle` there are two lines.
 
-    apktoolversion_major
-    apktoolversion_minor
+    version
+    suffix
 
-The major variable should be left unchanged. If done correctly, it will already be the version
-you are about to release. In this case `2.2.2`. The minor variable should read `SNAPSHOT` as
+The version variable should be left unchanged. If done correctly, it will already be the version
+you are about to release. In this case `2.2.2`. The suffix variable should read `SNAPSHOT` as
 the `2.2.2` release up until this point was `SNAPSHOT` releases (Unofficial).
 
 We need to remove the `SNAPSHOT` portion and leave the minor version blank. An example can be
@@ -36,11 +26,11 @@ with the commit message - `version bump (x.x.x)`.
 
 At this point we now have the commit of the release, but we need to tag it using the following message.
 
-    git tag -a vx.x.x -m "changed version to vx.x.x"
+    git tag -a vx.x.x -m "changed version to vx.x.x" -s
 
 For example for the `2.2.1` release.
 
-    git tag -a v2.2.1 -m "changed version to v2.2.1"
+    git tag -a v2.2.1 -m "changed version to v2.2.1" -s
 
 ### Prepare for publishing.
 
@@ -56,12 +46,12 @@ ossrhUsername={sonatypeUsername}
 ossrhPassword={sonatypePassword}
 ```
 
-If `release` or `snapshot` is used publishing will be automatically attempted.
+Release with maven with `./gradlew build shadowJar release publish`.
 
 ### Building the binary.
 
 In order to maintain a clean slate. Run `gradlew clean` to start from a clean slate. Now lets build
-the new version. We should not have any new commits since the tagged commit.
+the new binary version. We should not have any new commits since the tagged commit.
 
     ./gradlew build shadowJar proguard release
 
@@ -151,10 +141,9 @@ except for containing sha256 hashes.
 
 The hashes match so we are good with the backup server.
 
-
 #### Sonatype
 
-You'll want to log in and view the Staging repostories and confirm you see the recently made build. You'll want to:
+You'll want to log in and view the Staging repositories and confirm you see the recently made build. You'll want to:
 
  * Close it (Wait for audit report email)
  * Release it (Drop the staging repository)
@@ -208,10 +197,9 @@ The Apktool project website has a few locations to update:
 
 1. The homepage intro
 2. The download link in header
-3. The changelog page
-4. The footer of homepage with history of releases.
+3. Migrating `unreleased.mx` to a new blog post.
 
-The easiest way to describe this is to just link to a [previous release](https://github.com/iBotPeaches/Apktool/commit/5ef77bf01cf3625cb1dd1981234b3854b02496e2).
+The easiest way to describe this is to just link to a [previous release](https://github.com/iBotPeaches/Apktool/pull/3146/files).
 
 ### Update Milestones
 
@@ -231,9 +219,12 @@ where the release post was and send that link to Twitter, Google and whatever el
 
 Relax and watch the bug tracker.
 
-# Building aapt binaries.
+# Building aapt2 binaries.
 
-The steps taken for building our modified aapt binaries for apktool.
+> [!WARNING]
+> aapt (aapt1) is deprecated and no longer receives updates.
+
+The steps taken for building our modified aapt2 binaries for apktool.
 
 ### Getting the modified `frameworks/base` repo.
 First step is using the [platform_frameworks_base](https://github.com/iBotPeaches/platform_frameworks_base) repo.
@@ -253,13 +244,18 @@ original as they were.
 As cheesy as it is, just follow this [downloading](https://source.android.com/source/downloading.html) link in order
 to get the source downloaded. This is no small download, expect to use 150-250GB.
 
+Some optimization techniques for a smaller clone:
+
+ * `~/bin/repo init -u https://android.googlesource.com/platform/manifest -b master --partial-clone` - Partial clone
+ * `repo sync -c` - Only current branch
+
 After that, you need to build AOSP via this [documentation](https://source.android.com/source/building.html) guide. Now
 we aren't building the entire AOSP package, the initial build is to just see if you are capable of building it.
 
-We check out a certain tag or branch. Currently we use
+We check out a certain tag or branch. Currently, we use
 
- * aapt2 - `master`.
- * aapt1 - `master`.
+ * aapt2 - `android-14.0.0_r54`
+ * aapt1 - `android-14.0.0_r2` (deprecated)
 
 ### Including our modified `frameworks/base` package.
 
@@ -270,13 +266,21 @@ There is probably a more automated way to do this, but for now:
 3. `git fetch origin -v`
 4. `git checkout origin/master`
 
+#### Mac Patch
+
+Normally you'll be building this on a recent Mac OS that isn't supported. You'll want to follow these steps:
+
+1. `vim build/soong/cc/config/darwin_host.go`
+2. Find `darwinSupportedSdkVersions` array.
+3. Add number that corresponds to output of: `find /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs -iname "*.sdk"`
+
 ### Building the aapt1 (Legacy) binary.
 
 The steps below are different per flavor and operating system.
 
 #### Linux / Windows
 1. `source build/envsetup.sh`
-2. `lunch sdk-eng`
+2. `lunch aosp_arm64-trunk_staging-eng`
 3. `m aapt`
 4. `strip out/host/linux-x86/bin/aapt`
 5. `strip out/host/linux-x86/bin/aapt_64`
@@ -295,17 +299,20 @@ The steps below are different per flavor and operating system.
 The steps below are different per flavor and operating system.
 
 #### Linux / Windows
+1. `source build/envsetup.sh`
+1. `lunch aosp_arm64-trunk_staging-eng`
 1. `m aapt2`
-2. `strip out/host/linux-x86/bin/aapt2`
-3. `strip out/host/linux-x86/bin/aapt2_64`
-4. `strip out/host/windows-x86/bin/aapt2.exe`
-5. `strip out/host/windows-x86/bin/aapt2_64.exe`
+1. `strip out/host/linux-x86/bin/aapt2`
+1. `strip out/host/linux-x86/bin/aapt2_64`
+1. `strip out/host/windows-x86/bin/aapt2.exe`
+1. `strip out/host/windows-x86/bin/aapt2_64.exe`
 
 #### Mac
 1. `export ANDROID_JAVA_HOME=/Path/To/Jdk`
-2. `source build/envsetup.sh`
-3. `m aapt2`
-4. `strip out/host/darwin-x86/bin/aapt2_64`
+1. `source build/envsetup.sh`
+1. `lunch aosp_arm64-trunk_staging-eng`
+1. `m aapt2`
+1. `strip out/host/darwin-x86/bin/aapt2_64`
 
 #### Confirming aapt/aapt2 builds are static
 

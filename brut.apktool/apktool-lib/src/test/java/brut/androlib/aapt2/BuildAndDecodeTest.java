@@ -16,50 +16,40 @@
  */
 package brut.androlib.aapt2;
 
-import brut.androlib.*;
-import brut.androlib.meta.MetaInfo;
-import brut.androlib.options.BuildOptions;
+import brut.androlib.ApkBuilder;
+import brut.androlib.ApkDecoder;
+import brut.androlib.BaseTest;
+import brut.androlib.TestUtils;
+import brut.androlib.apk.ApkInfo;
 import brut.common.BrutException;
 import brut.directory.ExtFile;
-import brut.util.OS;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.w3c.dom.Document;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
 
 import java.io.File;
-import java.io.IOException;
 
+import org.junit.*;
 import static org.junit.Assert.*;
 
 public class BuildAndDecodeTest extends BaseTest {
 
     @BeforeClass
     public static void beforeClass() throws Exception {
-        TestUtils.cleanFrameworkFile();
-
-        sTmpDir = new ExtFile(OS.createTempDirectory());
         sTestOrigDir = new ExtFile(sTmpDir, "testapp-orig");
         sTestNewDir = new ExtFile(sTmpDir, "testapp-new");
-        LOGGER.info("Unpacking testapp...");
-        TestUtils.copyResourceDir(BuildAndDecodeTest.class, "aapt2/testapp/", sTestOrigDir);
 
-        BuildOptions buildOptions = new BuildOptions();
-        buildOptions.useAapt2 = true;
-        buildOptions.verbose = true;
+        LOGGER.info("Unpacking testapp...");
+        TestUtils.copyResourceDir(BuildAndDecodeTest.class, "aapt2/testapp", sTestOrigDir);
+
+        sConfig.setVerbose(true);
 
         LOGGER.info("Building testapp.apk...");
-        File testApk = new File(sTmpDir, "testapp.apk");
-        new Androlib(buildOptions).build(sTestOrigDir, testApk);
+        ExtFile testApk = new ExtFile(sTmpDir, "testapp.apk");
+        new ApkBuilder(sTestOrigDir, sConfig).build(testApk);
 
         LOGGER.info("Decoding testapp.apk...");
-        ApkDecoder apkDecoder = new ApkDecoder(testApk);
-        apkDecoder.setOutDir(sTestNewDir);
-        apkDecoder.decode();
-    }
-
-    @AfterClass
-    public static void afterClass() throws BrutException {
-        OS.rmdir(sTmpDir);
+        new ApkDecoder(testApk, sConfig).decode(sTestNewDir);
     }
 
     @Test
@@ -68,18 +58,13 @@ public class BuildAndDecodeTest extends BaseTest {
     }
 
     @Test
-    public void valuesStringsTest() throws BrutException {
-        compareValuesFiles("values/strings.xml");
-    }
-
-    @Test
     public void valuesColorsTest() throws BrutException {
         compareValuesFiles("values/colors.xml");
     }
 
     @Test
-    public void valuesBoolsTest() throws BrutException {
-        compareValuesFiles("values/bools.xml");
+    public void valuesStringsTest() throws BrutException {
+        compareValuesFiles("values/strings.xml");
     }
 
     @Test
@@ -88,15 +73,39 @@ public class BuildAndDecodeTest extends BaseTest {
     }
 
     @Test
+    public void valuesBcp47LanguageVariantTest() throws BrutException {
+        compareValuesFiles("values-b+iw+660/strings.xml");
+    }
+
+    @Test
+    public void valuesGrammaticalGenderTest() throws BrutException {
+        compareValuesFiles("values-neuter/strings.xml");
+        compareValuesFiles("values-feminine/strings.xml");
+    }
+
+    @Test
+    public void valuesBcp47LanguageScriptRegionVariantTest() throws BrutException {
+        compareValuesFiles("values-b+ast+Latn+IT+AREVELA/strings.xml");
+        compareValuesFiles("values-b+ast+Hant+IT+ARABEXT/strings.xml");
+    }
+
+    @Test
+    public void confirmFeatureFlagsRecorded() throws BrutException {
+        ApkInfo testInfo = ApkInfo.load(sTestNewDir);
+        assertTrue(testInfo.featureFlags.get("brut.feature.permission"));
+        assertTrue(testInfo.featureFlags.get("brut.feature.activity"));
+    }
+
+    @Test
     public void confirmZeroByteFileExtensionIsNotStored() throws BrutException {
-        MetaInfo metaInfo = new Androlib().readMetaFile(sTestNewDir);
-        assertFalse(metaInfo.doNotCompress.contains("jpg"));
+        ApkInfo testInfo = ApkInfo.load(sTestNewDir);
+        assertFalse(testInfo.doNotCompress.contains("jpg"));
     }
 
     @Test
     public void confirmZeroByteFileIsStored() throws BrutException {
-        MetaInfo metaInfo = new Androlib().readMetaFile(sTestNewDir);
-        assertTrue(metaInfo.doNotCompress.contains("assets/0byte_file.jpg"));
+        ApkInfo testInfo = ApkInfo.load(sTestNewDir);
+        assertTrue(testInfo.doNotCompress.contains("assets/0byte_file.jpg"));
     }
 
     @Test
@@ -119,8 +128,8 @@ public class BuildAndDecodeTest extends BaseTest {
     }
 
     @Test
-    public void samsungQmgFilesHandledTest() throws IOException, BrutException {
-        compareBinaryFolder("drawable-xhdpi", true);
+    public void samsungQmgFilesHandledTest() throws BrutException {
+        compareBinaryFolder("res/drawable-xhdpi");
     }
 
     @Test
@@ -134,22 +143,45 @@ public class BuildAndDecodeTest extends BaseTest {
     }
 
     @Test
-    public void multipleDexTest() throws BrutException, IOException {
-        compareBinaryFolder("/smali_classes2", false);
-        compareBinaryFolder("/smali_classes3", false);
-
-        File classes2Dex = new File(sTestOrigDir, "build/apk/classes2.dex");
-        File classes3Dex = new File(sTestOrigDir, "build/apk/classes3.dex");
-
-        assertTrue(classes2Dex.isFile());
-        assertTrue(classes3Dex.isFile());
+    public void xmlAccessibilityTest() throws BrutException {
+        compareXmlFiles("res/xml/accessibility_service_config.xml");
     }
 
     @Test
-    public void singleDexTest() throws BrutException, IOException {
-        compareBinaryFolder("/smali", false);
+    public void multipleDexTest() throws BrutException {
+        compareBinaryFolder("smali_classes2");
+        compareBinaryFolder("smali_classes3");
+        assertTrue(new File(sTestOrigDir, "build/apk/classes2.dex").isFile());
+        assertTrue(new File(sTestOrigDir, "build/apk/classes3.dex").isFile());
+    }
 
-        File classesDex = new File(sTestOrigDir, "build/apk/classes.dex");
-        assertTrue(classesDex.isFile());
+    @Test
+    public void singleDexTest() throws BrutException {
+        compareBinaryFolder("smali");
+        assertTrue(new File(sTestOrigDir, "build/apk/classes.dex").isFile());
+    }
+
+    @Test
+    public void unknownFolderTest() throws BrutException {
+        compareBinaryFolder("unknown");
+    }
+
+    @Test
+    public void confirmPlatformManifestValuesTest() throws BrutException {
+        Document doc = loadDocument(new File(sTestNewDir, "AndroidManifest.xml"));
+        Node application = doc.getElementsByTagName("manifest").item(0);
+        NamedNodeMap attrs = application.getAttributes();
+
+        Node platformBuildVersionNameAttr = attrs.getNamedItem("platformBuildVersionName");
+        assertEquals("6.0-2438415", platformBuildVersionNameAttr.getNodeValue());
+
+        Node platformBuildVersionCodeAttr = attrs.getNamedItem("platformBuildVersionCode");
+        assertEquals("23", platformBuildVersionCodeAttr.getNodeValue());
+
+        Node compileSdkVersionAttr = attrs.getNamedItem("compileSdkVersion");
+        assertNull("compileSdkVersion should be stripped via aapt2", compileSdkVersionAttr);
+
+        Node compileSdkVersionCodenameAttr = attrs.getNamedItem("compileSdkVersionCodename");
+        assertNull("compileSdkVersionCodename should be stripped via aapt2", compileSdkVersionCodenameAttr);
     }
 }

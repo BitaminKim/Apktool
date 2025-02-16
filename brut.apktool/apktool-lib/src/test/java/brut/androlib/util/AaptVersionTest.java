@@ -16,19 +16,20 @@
  */
 package brut.androlib.util;
 
+import brut.androlib.BaseTest;
 import brut.common.BrutException;
 import brut.util.AaptManager;
-import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
+import org.junit.*;
+import static org.junit.Assert.*;
 
-public class AaptVersionTest {
+public class AaptVersionTest extends BaseTest {
 
     @Test
     public void testAapt2Iterations() throws BrutException {
-        assertEquals(2, AaptManager.getAppVersionFromString("Android Asset Packaging Tool (aapt) 2:17"));
-        assertEquals(2, AaptManager.getAppVersionFromString("Android Asset Packaging Tool (aapt) 2.17"));
-        assertEquals(1, AaptManager.getAppVersionFromString("Android Asset Packaging Tool, v0.9"));
-        assertEquals(1, AaptManager.getAppVersionFromString("Android Asset Packaging Tool, v0.2-2679779"));
+        assertEquals(2, AaptManager.getAaptVersionFromString("Android Asset Packaging Tool (aapt) 2:17"));
+        assertEquals(2, AaptManager.getAaptVersionFromString("Android Asset Packaging Tool (aapt) 2.17"));
+        assertEquals(1, AaptManager.getAaptVersionFromString("Android Asset Packaging Tool, v0.9"));
+        assertEquals(1, AaptManager.getAaptVersionFromString("Android Asset Packaging Tool, v0.2-2679779"));
     }
 }

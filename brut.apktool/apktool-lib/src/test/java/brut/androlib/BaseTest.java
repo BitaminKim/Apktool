@@ -16,61 +16,91 @@
  */
 package brut.androlib;
 
-import brut.androlib.meta.MetaInfo;
+import brut.androlib.Config;
+import brut.androlib.res.Framework;
 import brut.common.BrutException;
 import brut.directory.ExtFile;
-import brut.directory.FileDirectory;
-import org.custommonkey.xmlunit.*;
+import brut.util.OS;
+import brut.xml.XmlUtils;
+import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathExpressionException;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
-import java.util.Map;
-import java.util.Set;
 import java.util.logging.Logger;
 
-import static org.custommonkey.xmlunit.XMLAssert.assertXMLEqual;
+import org.junit.*;
 import static org.junit.Assert.*;
 
+import org.custommonkey.xmlunit.*;
+import static org.custommonkey.xmlunit.XMLAssert.assertXMLEqual;
+
 public class BaseTest {
+    protected static final Logger LOGGER = Logger.getLogger(BaseTest.class.getName());
 
-    protected void compareUnknownFiles() throws BrutException {
-        MetaInfo control = new Androlib().readMetaFile(sTestOrigDir);
-        MetaInfo test = new Androlib().readMetaFile(sTestNewDir);
-        assertNotNull(control.unknownFiles);
-        assertNotNull(test.unknownFiles);
+    protected static Config sConfig;
+    protected static File sTmpDir;
+    protected static ExtFile sTestOrigDir;
+    protected static ExtFile sTestNewDir;
 
-        Map<String, String> controlFiles = control.unknownFiles;
-        Map<String, String> testFiles = test.unknownFiles;
-        assertEquals(controlFiles.size(), testFiles.size());
-
-        // Make sure that the compression methods are still the same
-        for (Map.Entry<String, String> controlEntry : controlFiles.entrySet()) {
-            assertEquals(controlEntry.getValue(), testFiles.get(controlEntry.getKey()));
+    private static void cleanFrameworkFile() throws BrutException {
+        File apkFile = new File(new Framework(sConfig).getDirectory(), "1.apk");
+        if (apkFile.isFile()) {
+            OS.rmfile(apkFile.getAbsolutePath());
         }
     }
 
-    protected void compareBinaryFolder(String path, boolean res) throws BrutException, IOException {
-        boolean exists = true;
+    @BeforeClass
+    public static void beforeEachClass() throws Exception {
+        sConfig = new Config();
+        cleanFrameworkFile();
 
-        String prefixPath = "";
-        if (res) {
-            prefixPath = File.separatorChar + "res" + File.separatorChar;
+        sTmpDir = OS.createTempDirectory();
+    }
+
+    @AfterClass
+    public static void afterEachClass() throws Exception {
+        if (sTestOrigDir != null) {
+            sTestOrigDir.close();
+            sTestOrigDir = null;
         }
 
-        String location = prefixPath + path;
+        if (sTestNewDir != null) {
+            sTestNewDir.close();
+            sTestNewDir = null;
+        }
 
-        FileDirectory fileDirectory = new FileDirectory(sTestOrigDir, location);
+        OS.rmdir(sTmpDir);
+        sTmpDir = null;
 
-        Set<String> files = fileDirectory.getFiles(true);
-        for (String filename : files) {
+        cleanFrameworkFile();
+        sConfig = null;
+    }
 
-            File control = new File((sTestOrigDir + location), filename);
-            File test =  new File((sTestNewDir + location), filename);
+    @Before
+    public void beforeEachTest() throws Exception {
+        sConfig = new Config();
+    }
 
-            if (! test.isFile() || ! control.isFile()) {
+    protected void compareBinaryFolder(String path) throws BrutException {
+        compareBinaryFolder(sTestOrigDir, sTestNewDir, path);
+    }
+
+    protected void compareBinaryFolder(File controlDir, File testDir, String path) throws BrutException {
+        ExtFile controlBase = new ExtFile(controlDir, path);
+        File testBase = new File(testDir, path);
+
+        boolean exists = true;
+
+        for (String fileName : controlBase.getDirectory().getFiles(true)) {
+            File control = new File(controlBase, fileName);
+            File test = new File(testBase, fileName);
+
+            if (!control.isFile() || !test.isFile()) {
                 exists = false;
             }
         }
@@ -78,62 +108,62 @@ public class BaseTest {
         assertTrue(exists);
     }
 
-    protected void compareResFolder(String path) throws BrutException, IOException {
-        compareBinaryFolder(path, true);
-    }
-
-    protected void compareLibsFolder(String path) throws BrutException, IOException {
-        compareBinaryFolder(File.separatorChar + path, false);
-    }
-
-    protected void compareAssetsFolder(String path) throws BrutException, IOException {
-        compareBinaryFolder(File.separatorChar + "assets" + File.separatorChar + path, false);
-    }
-
     protected void compareValuesFiles(String path) throws BrutException {
-        compareXmlFiles("res/" + path, new ElementNameAndAttributeQualifier("name"));
+        compareValuesFiles(sTestOrigDir, sTestNewDir, path);
+    }
+
+    protected void compareValuesFiles(File controlDir, File testDir, String path) throws BrutException {
+        compareXmlFiles(controlDir, testDir, "res/" + path, new ElementNameAndAttributeQualifier("name"));
     }
 
     protected void compareXmlFiles(String path) throws BrutException {
-        compareXmlFiles(path, null);
+        compareXmlFiles(sTestOrigDir, sTestNewDir, path);
     }
 
-    protected  void checkFolderExists(String path) {
-        File f =  new File(sTestNewDir, path);
-
-        assertTrue(f.isDirectory());
+    protected void compareXmlFiles(File controlDir, File testDir, String path) throws BrutException {
+        compareXmlFiles(controlDir, testDir, path, null);
     }
 
-    protected boolean isTransparent(int pixel) {
-        return pixel >> 24 == 0x00;
-    }
-
-    private void compareXmlFiles(String path, ElementQualifier qualifier) throws BrutException {
-        DetailedDiff diff;
+    private void compareXmlFiles(File controlDir, File testDir, String path, ElementQualifier qualifier)
+            throws BrutException {
         try {
-            Reader control = new FileReader(new File(sTestOrigDir, path));
-            Reader test = new FileReader(new File(sTestNewDir, path));
+            Reader control = new FileReader(new File(controlDir, path));
+            Reader test = new FileReader(new File(testDir, path));
+
+            XMLUnit.setEnableXXEProtection(true);
 
             if (qualifier == null) {
                 XMLUnit.setIgnoreWhitespace(true);
                 XMLUnit.setIgnoreAttributeOrder(true);
                 XMLUnit.setCompareUnmatched(false);
+
                 assertXMLEqual(control, test);
                 return;
             }
 
-            diff = new DetailedDiff(new Diff(control, test));
-        } catch (SAXException | IOException ex) {
+            DetailedDiff diff = new DetailedDiff(new Diff(control, test));
+            diff.overrideElementQualifier(qualifier);
+
+            assertTrue(path + ": " + diff.getAllDifferences().toString(), diff.similar());
+        } catch (IOException | SAXException ex) {
             throw new BrutException(ex);
         }
-
-        diff.overrideElementQualifier(qualifier);
-        assertTrue(path + ": " + diff.getAllDifferences().toString(), diff.similar());
     }
 
-    protected static ExtFile sTmpDir;
-    protected static ExtFile sTestOrigDir;
-    protected static ExtFile sTestNewDir;
+    protected static Document loadDocument(File file) throws BrutException {
+        try {
+            return XmlUtils.loadDocument(file);
+        } catch (IOException | SAXException | ParserConfigurationException ex) {
+            throw new BrutException(ex);
+        }
+    }
 
-    protected final static Logger LOGGER = Logger.getLogger(BaseTest.class.getName());
+    protected static <T> T evaluateXPath(Document doc, String expression, Class<T> returnType)
+            throws BrutException {
+        try {
+            return XmlUtils.evaluateXPath(doc, expression, returnType);
+        } catch (XPathExpressionException ex) {
+            throw new BrutException(ex);
+        }
+    }
 }
