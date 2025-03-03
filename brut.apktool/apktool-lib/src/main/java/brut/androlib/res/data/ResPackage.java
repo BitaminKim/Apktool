@@ -16,44 +16,56 @@
  */
 package brut.androlib.res.data;
 
-import brut.androlib.AndrolibException;
-import brut.androlib.err.UndefinedResObjectException;
+import brut.androlib.Config;
+import brut.androlib.exceptions.AndrolibException;
+import brut.androlib.exceptions.UndefinedResObjectException;
 import brut.androlib.res.data.value.ResFileValue;
 import brut.androlib.res.data.value.ResValueFactory;
 import brut.androlib.res.xml.ResValuesXmlSerializable;
-import brut.util.Duo;
+import org.apache.commons.lang3.tuple.Pair;
+
 import java.util.*;
 import java.util.logging.Logger;
 
 public class ResPackage {
+    private static final Logger LOGGER = Logger.getLogger(ResPackage.class.getName());
+
     private final ResTable mResTable;
     private final int mId;
     private final String mName;
-    private final Map<ResID, ResResSpec> mResSpecs = new LinkedHashMap<>();
-    private final Map<ResConfigFlags, ResType> mConfigs = new LinkedHashMap<>();
-    private final Map<String, ResTypeSpec> mTypes = new LinkedHashMap<>();
-    private final Set<ResID> mSynthesizedRes = new HashSet<>();
+    private final Map<ResID, ResResSpec> mResSpecs;
+    private final Map<ResConfigFlags, ResType> mConfigs;
+    private final Map<String, ResTypeSpec> mTypes;
+    private final Set<ResID> mSynthesizedRes;
 
     private ResValueFactory mValueFactory;
 
     public ResPackage(ResTable resTable, int id, String name) {
-        this.mResTable = resTable;
-        this.mId = id;
-        this.mName = name;
+        mResTable = resTable;
+        mId = id;
+        mName = name;
+        mResSpecs = new LinkedHashMap<>();
+        mConfigs = new LinkedHashMap<>();
+        mTypes = new LinkedHashMap<>();
+        mSynthesizedRes = new HashSet<>();
+    }
+
+    public Config getConfig() {
+        return mResTable.getConfig();
     }
 
     public List<ResResSpec> listResSpecs() {
         return new ArrayList<>(mResSpecs.values());
     }
 
-    public boolean hasResSpec(ResID resID) {
-        return mResSpecs.containsKey(resID);
+    public boolean hasResSpec(ResID resId) {
+        return mResSpecs.containsKey(resId);
     }
 
-    public ResResSpec getResSpec(ResID resID) throws UndefinedResObjectException {
-        ResResSpec spec = mResSpecs.get(resID);
+    public ResResSpec getResSpec(ResID resId) throws UndefinedResObjectException {
+        ResResSpec spec = mResSpecs.get(resId);
         if (spec == null) {
-            throw new UndefinedResObjectException("resource spec: " + resID.toString());
+            throw new UndefinedResObjectException("resource spec: " + resId);
         }
         return spec;
     }
@@ -79,7 +91,7 @@ public class ResPackage {
         return type;
     }
 
-    public Set<ResResource> listFiles() {
+    public Collection<ResResource> listFiles() {
         Set<ResResource> ret = new HashSet<>();
         for (ResResSpec spec : mResSpecs.values()) {
             for (ResResource res : spec.listResources()) {
@@ -92,13 +104,13 @@ public class ResPackage {
     }
 
     public Collection<ResValuesFile> listValuesFiles() {
-        Map<Duo<ResTypeSpec, ResType>, ResValuesFile> ret = new HashMap<>();
+        Map<Pair<ResTypeSpec, ResType>, ResValuesFile> ret = new HashMap<>();
         for (ResResSpec spec : mResSpecs.values()) {
             for (ResResource res : spec.listResources()) {
                 if (res.getValue() instanceof ResValuesXmlSerializable) {
                     ResTypeSpec type = res.getResSpec().getType();
                     ResType config = res.getConfig();
-                    Duo<ResTypeSpec, ResType> key = new Duo<>(type, config);
+                    Pair<ResTypeSpec, ResType> key = Pair.of(type, config);
                     ResValuesFile values = ret.get(key);
                     if (values == null) {
                         values = new ResValuesFile(this, type, config);
@@ -127,10 +139,6 @@ public class ResPackage {
         return mSynthesizedRes.contains(resId);
     }
 
-    public void removeResSpec(ResResSpec spec) {
-        mResSpecs.remove(spec.getId());
-    }
-
     public void addResSpec(ResResSpec spec) throws AndrolibException {
         if (mResSpecs.put(spec.getId(), spec) != null) {
             throw new AndrolibException("Multiple resource specs: " + spec);
@@ -156,25 +164,20 @@ public class ResPackage {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
+        if (obj == this) {
+            return true;
         }
-        if (getClass() != obj.getClass()) {
-            return false;
+        if (obj instanceof ResPackage) {
+            ResPackage other = (ResPackage) obj;
+            return Objects.equals(mResTable, other.mResTable)
+                    && mId == other.mId;
         }
-        final ResPackage other = (ResPackage) obj;
-        if (!Objects.equals(this.mResTable, other.mResTable)) {
-            return false;
-        }
-        return this.mId == other.mId;
+        return false;
     }
 
     @Override
     public int hashCode() {
-        int hash = 17;
-        hash = 31 * hash + (this.mResTable != null ? this.mResTable.hashCode() : 0);
-        hash = 31 * hash + this.mId;
-        return hash;
+        return Objects.hash(mResTable, mId);
     }
 
     public ResValueFactory getValueFactory() {
@@ -183,6 +186,4 @@ public class ResPackage {
         }
         return mValueFactory;
     }
-
-    private final static Logger LOGGER = Logger.getLogger(ResPackage.class.getName());
 }

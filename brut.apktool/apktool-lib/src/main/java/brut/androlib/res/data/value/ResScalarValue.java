@@ -16,7 +16,7 @@
  */
 package brut.androlib.res.data.value;
 
-import brut.androlib.AndrolibException;
+import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.res.data.ResResource;
 import brut.androlib.res.xml.ResValuesXmlSerializable;
 import brut.androlib.res.xml.ResXmlEncodable;
@@ -65,15 +65,15 @@ public abstract class ResScalarValue extends ResIntBasedValue implements
     }
 
     @Override
-    public void serializeToResValuesXml(XmlSerializer serializer,
-                                        ResResource res) throws IOException, AndrolibException {
+    public void serializeToResValuesXml(XmlSerializer serializer, ResResource res)
+            throws AndrolibException, IOException {
         String type = res.getResSpec().getType().getName();
         boolean item = !"reference".equals(mType) && !type.equals(mType);
 
         String body = encodeAsResXmlValue();
 
         // check for resource reference
-        if (!type.equalsIgnoreCase("color")) {
+        if (!type.equals("color")) {
             if (body.contains("@")) {
                 if (!res.getFilePath().contains("string")) {
                     item = true;
@@ -89,7 +89,7 @@ public abstract class ResScalarValue extends ResIntBasedValue implements
         // Android does not allow values (false) for ids.xml anymore
         // https://issuetracker.google.com/issues/80475496
         // But it decodes as a ResBoolean, which makes no sense. So force it to empty
-        if (type.equalsIgnoreCase("id") && !body.isEmpty()) {
+        if (type.equals("id") && !body.isEmpty()) {
             body = "";
         }
 
@@ -115,8 +115,9 @@ public abstract class ResScalarValue extends ResIntBasedValue implements
         return mType;
     }
 
-    protected void serializeExtraXmlAttrs(XmlSerializer serializer,
-                                          ResResource res) throws IOException {
+    protected void serializeExtraXmlAttrs(XmlSerializer serializer, ResResource res)
+            throws IOException {
+        // stub
     }
 
     protected abstract String encodeAsResXml() throws AndrolibException;

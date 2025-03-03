@@ -16,56 +16,48 @@
  */
 package brut.androlib.decode;
 
-import brut.androlib.ApkDecoder;
 import brut.androlib.BaseTest;
 import brut.androlib.TestUtils;
+import brut.androlib.apk.ApkInfo;
+import brut.androlib.res.ResourcesDecoder;
 import brut.androlib.res.data.ResTable;
 import brut.androlib.res.data.value.ResArrayValue;
 import brut.androlib.res.data.value.ResValue;
 import brut.common.BrutException;
 import brut.directory.ExtFile;
-import brut.util.OS;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
-import java.io.File;
-
-import static junit.framework.Assert.assertTrue;
+import org.junit.*;
+import static org.junit.Assert.*;
 
 public class DecodeArrayTest extends BaseTest {
+    private static ResTable sResTable;
 
     @BeforeClass
     public static void beforeClass() throws Exception {
-        TestUtils.cleanFrameworkFile();
-        sTmpDir = new ExtFile(OS.createTempDirectory());
-        TestUtils.copyResourceDir(MissingVersionManifestTest.class, "decode/issue1994/", sTmpDir);
+        TestUtils.copyResourceDir(MissingVersionManifestTest.class, "decode/issue1994", sTmpDir);
+
+        LOGGER.info("Decoding issue1994.apk...");
+        ExtFile testApk = new ExtFile(sTmpDir, "issue1994.apk");
+        ApkInfo testInfo = new ApkInfo(testApk);
+        ResourcesDecoder resDecoder = new ResourcesDecoder(testInfo, sConfig);
+        resDecoder.loadMainPkg();
+        sResTable = resDecoder.getResTable();
     }
 
     @AfterClass
-    public static void afterClass() throws BrutException {
-        OS.rmdir(sTmpDir);
+    public static void afterClass() throws Exception {
+        sResTable.getApkInfo().getApkFile().close();
     }
 
     @Test
     public void decodeStringArray() throws BrutException {
-        String apk = "issue1994.apk";
-        ApkDecoder apkDecoder = new ApkDecoder(new File(sTmpDir + File.separator + apk));
-
-        ResTable resTable = apkDecoder.getResTable();
-        ResValue value = resTable.getResSpec(0x7f020001).getDefaultResource().getValue();
-
+        ResValue value = sResTable.getResSpec(0x7f020001).getDefaultResource().getValue();
         assertTrue("Not a ResArrayValue. Found: " + value.getClass(), value instanceof ResArrayValue);
     }
 
     @Test
     public void decodeArray() throws BrutException {
-        String apk = "issue1994.apk";
-        ApkDecoder apkDecoder = new ApkDecoder(new File(sTmpDir + File.separator + apk));
-
-        ResTable resTable = apkDecoder.getResTable();
-        ResValue value = resTable.getResSpec(0x7f020000).getDefaultResource().getValue();
-
+        ResValue value = sResTable.getResSpec(0x7f020000).getDefaultResource().getValue();
         assertTrue("Not a ResArrayValue. Found: " + value.getClass(), value instanceof ResArrayValue);
     }
 }

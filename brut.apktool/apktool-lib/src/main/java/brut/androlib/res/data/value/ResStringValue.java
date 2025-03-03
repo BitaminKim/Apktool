@@ -16,7 +16,7 @@
  */
 package brut.androlib.res.data.value;
 
-import brut.androlib.AndrolibException;
+import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.res.data.ResResource;
 import brut.androlib.res.xml.ResXmlEncoders;
 import org.xmlpull.v1.XmlSerializer;
@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.regex.Pattern;
 
 public class ResStringValue extends ResScalarValue {
+    private static final Pattern ALL_DIGITS = Pattern.compile("\\d{9,}");
 
     public ResStringValue(String value, int rawValue) {
         this(value, rawValue, "string");
@@ -55,7 +56,8 @@ public class ResStringValue extends ResScalarValue {
     }
 
     @Override
-    protected void serializeExtraXmlAttrs(XmlSerializer serializer, ResResource res) throws IOException {
+    protected void serializeExtraXmlAttrs(XmlSerializer serializer, ResResource res)
+            throws IOException {
         if (ResXmlEncoders.hasMultipleNonPositionalSubstitutions(mRawValue)) {
             serializer.attribute(null, "formatted", "false");
         }
@@ -65,8 +67,6 @@ public class ResStringValue extends ResScalarValue {
         if (val == null || val.isEmpty()) {
             return val;
         }
-        return allDigits.matcher(val).matches() ? "\\ " + val : val;
+        return ALL_DIGITS.matcher(val).matches() ? "\\ " + val : val;
     }
-
-    private static final Pattern allDigits = Pattern.compile("\\d{9,}");
 }

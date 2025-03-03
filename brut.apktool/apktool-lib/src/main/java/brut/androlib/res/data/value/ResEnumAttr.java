@@ -16,30 +16,38 @@
  */
 package brut.androlib.res.data.value;
 
-import brut.androlib.AndrolibException;
+import brut.androlib.Config;
+import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.res.data.ResResSpec;
 import brut.androlib.res.data.ResResource;
-import brut.util.Duo;
+import org.apache.commons.lang3.tuple.Pair;
 import org.xmlpull.v1.XmlSerializer;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 public class ResEnumAttr extends ResAttr {
-    ResEnumAttr(ResReferenceValue parent, int type, Integer min, Integer max,
-                Boolean l10n, Duo<ResReferenceValue, ResIntValue>[] items) {
+    private static final Logger LOGGER = Logger.getLogger(ResEnumAttr.class.getName());
+
+    private final Pair<ResReferenceValue, ResScalarValue>[] mItems;
+    private final Map<Integer, String> mItemsCache;
+
+    ResEnumAttr(ResReferenceValue parent, int type, Integer min, Integer max, Boolean l10n,
+                Pair<ResReferenceValue, ResScalarValue>[] items) {
         super(parent, type, min, max, l10n);
         mItems = items;
+        mItemsCache = new HashMap<>();
     }
 
     @Override
     public String convertToResXmlFormat(ResScalarValue value)
             throws AndrolibException {
         if (value instanceof ResIntValue) {
-            String ret = decodeValue(((ResIntValue) value).getValue());
-            if (ret != null) {
-                return ret;
+            String decoded = decodeValue(((ResIntValue) value).getValue());
+            if (decoded != null) {
+                return decoded;
             }
         }
         return super.convertToResXmlFormat(value);
@@ -48,37 +56,42 @@ public class ResEnumAttr extends ResAttr {
     @Override
     protected void serializeBody(XmlSerializer serializer, ResResource res)
             throws AndrolibException, IOException {
-        for (Duo<ResReferenceValue, ResIntValue> duo : mItems) {
-            int intVal = duo.m2.getValue();
-            ResResSpec m1Referent = duo.m1.getReferent();
+        for (Pair<ResReferenceValue, ResScalarValue> item : mItems) {
+            ResReferenceValue ref = item.getLeft();
+            ResScalarValue val = item.getRight();
+
+            // #2836 - Support skipping items if the resource cannot be identified.
+            ResResSpec referent = ref.getReferent();
+            if (referent == null && mConfig.getDecodeResolveMode() == Config.DECODE_RES_RESOLVE_REMOVE) {
+                LOGGER.fine(String.format("null enum reference: ref=0x%08x(%s), val=0x%08x(%s)",
+                    ref.getRawIntValue(), ref.getType(), val.getRawIntValue(), val.getType()));
+                continue;
+            }
 
             serializer.startTag(null, "enum");
-            serializer.attribute(null, "name",
-                    m1Referent != null ? m1Referent.getName() : "@null"
-            );
-            serializer.attribute(null, "value", String.valueOf(intVal));
+            serializer.attribute(null, "name", referent != null
+                ? referent.getName() : String.format("APKTOOL_MISSING_0x%08x", ref.getRawIntValue()));
+            serializer.attribute(null, "value", String.valueOf(val.getRawIntValue()));
             serializer.endTag(null, "enum");
         }
     }
 
     private String decodeValue(int value) throws AndrolibException {
-        String value2 = mItemsCache.get(value);
-        if (value2 == null) {
+        String decoded = mItemsCache.get(value);
+        if (decoded == null) {
             ResReferenceValue ref = null;
-            for (Duo<ResReferenceValue, ResIntValue> duo : mItems) {
-                if (duo.m2.getValue() == value) {
-                    ref = duo.m1;
+            for (Pair<ResReferenceValue, ResScalarValue> item : mItems) {
+                ResScalarValue val = item.getRight();
+                if (val.getRawIntValue() == value) {
+                    ref = item.getLeft();
                     break;
                 }
             }
-            if (ref != null) {
-                value2 = ref.getReferent().getName();
-                mItemsCache.put(value, value2);
+            if (ref != null && !ref.referentIsNull()) {
+                decoded = ref.getReferent().getName();
+                mItemsCache.put(value, decoded);
             }
         }
-        return value2;
+        return decoded;
     }
-
-    private final Duo<ResReferenceValue, ResIntValue>[] mItems;
-    private final Map<Integer, String> mItemsCache = new HashMap<>();
 }

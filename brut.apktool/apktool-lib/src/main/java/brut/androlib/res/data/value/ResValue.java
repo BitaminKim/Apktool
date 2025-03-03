@@ -16,6 +16,8 @@
  */
 package brut.androlib.res.data.value;
 
-public class ResValue {
+public abstract class ResValue {
 
+    protected ResValue() {
+    }
 }

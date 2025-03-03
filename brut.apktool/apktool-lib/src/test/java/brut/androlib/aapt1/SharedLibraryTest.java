@@ -16,101 +16,78 @@
  */
 package brut.androlib.aapt1;
 
-import brut.androlib.*;
-import brut.androlib.options.BuildOptions;
+import brut.androlib.ApkBuilder;
+import brut.androlib.ApkDecoder;
+import brut.androlib.BaseTest;
+import brut.androlib.TestUtils;
+import brut.androlib.res.Framework;
 import brut.directory.ExtFile;
 import brut.common.BrutException;
-import brut.util.OS;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
-import static org.junit.Assert.assertTrue;
+import org.junit.*;
+import static org.junit.Assert.*;
 
 public class SharedLibraryTest extends BaseTest {
+    private static final String LIBRARY_APK = "library.apk";
+    private static final String CLIENT_APK = "client.apk";
 
     @BeforeClass
-    public static void beforeClass() throws BrutException {
-        TestUtils.cleanFrameworkFile();
-        sTmpDir = new ExtFile(OS.createTempDirectory());
-        TestUtils.copyResourceDir(SharedLibraryTest.class, "aapt1/shared_libraries/", sTmpDir);
-    }
-
-    @AfterClass
-    public static void afterClass() throws BrutException {
-        OS.rmdir(sTmpDir);
+    public static void beforeClass() throws Exception {
+        TestUtils.copyResourceDir(SharedLibraryTest.class, "aapt1/shared_libraries", sTmpDir);
     }
 
     @Test
-    public void isFrameworkTaggingWorking() throws AndrolibException {
-        String apkName = "library.apk";
+    public void isFrameworkTaggingWorking() throws BrutException {
+        sConfig.setFrameworkDirectory(sTmpDir.getAbsolutePath());
+        sConfig.setFrameworkTag("building");
 
-        BuildOptions buildOptions = new BuildOptions();
-        buildOptions.frameworkFolderLocation = sTmpDir.getAbsolutePath();
-        buildOptions.frameworkTag = "building";
+        ExtFile libraryApk = new ExtFile(sTmpDir, LIBRARY_APK);
+        new Framework(sConfig).install(libraryApk);
 
-        new Androlib(buildOptions).installFramework(new File(sTmpDir + File.separator + apkName));
-
-        assertTrue(fileExists("2-building.apk"));
+        assertTrue(new File(sTmpDir, "2-building.apk").exists());
     }
 
     @Test
-    public void isFrameworkInstallingWorking() throws AndrolibException {
-        String apkName = "library.apk";
+    public void isFrameworkInstallingWorking() throws BrutException {
+        sConfig.setFrameworkDirectory(sTmpDir.getAbsolutePath());
 
-        BuildOptions buildOptions = new BuildOptions();
-        buildOptions.frameworkFolderLocation = sTmpDir.getAbsolutePath();
+        ExtFile libraryApk = new ExtFile(sTmpDir, LIBRARY_APK);
+        new Framework(sConfig).install(libraryApk);
 
-        new Androlib(buildOptions).installFramework(new File(sTmpDir + File.separator + apkName));
-
-        assertTrue(fileExists("2.apk"));
+        assertTrue(new File(sTmpDir, "2.apk").exists());
     }
 
     @Test
-    public void isSharedResourceDecodingAndRebuildingWorking() throws IOException, BrutException {
-        String library = "library.apk";
-        String client = "client.apk";
-
-        // setup apkOptions
-        BuildOptions buildOptions = new BuildOptions();
-        buildOptions.frameworkFolderLocation = sTmpDir.getAbsolutePath();
-        buildOptions.frameworkTag = "shared";
+    public void isSharedResourceDecodingAndRebuildingWorking() throws BrutException {
+        sConfig.setFrameworkDirectory(sTmpDir.getAbsolutePath());
+        sConfig.setFrameworkTag("shared");
+        sConfig.setAaptVersion(1);
 
         // install library/framework
-        new Androlib(buildOptions).installFramework(new File(sTmpDir + File.separator + library));
-        assertTrue(fileExists("2-shared.apk"));
+        ExtFile libraryApk = new ExtFile(sTmpDir, LIBRARY_APK);
+        new Framework(sConfig).install(libraryApk);
+
+        assertTrue(new File(sTmpDir, "2-shared.apk").exists());
 
         // decode client.apk
-        ApkDecoder apkDecoder = new ApkDecoder(new File(sTmpDir + File.separator + client));
-        apkDecoder.setOutDir(new File(sTmpDir + File.separator + client + ".out"));
-        apkDecoder.setFrameworkDir(buildOptions.frameworkFolderLocation);
-        apkDecoder.setFrameworkTag(buildOptions.frameworkTag);
-        apkDecoder.decode();
+        ExtFile clientApk = new ExtFile(sTmpDir, CLIENT_APK);
+        ExtFile clientDir = new ExtFile(clientApk + ".out");
+        new ApkDecoder(clientApk, sConfig).decode(clientDir);
 
         // decode library.apk
-        ApkDecoder libraryDecoder = new ApkDecoder(new File(sTmpDir + File.separator + library));
-        libraryDecoder.setOutDir(new File(sTmpDir + File.separator + library + ".out"));
-        libraryDecoder.setFrameworkDir(buildOptions.frameworkFolderLocation);
-        libraryDecoder.setFrameworkTag(buildOptions.frameworkTag);
-        libraryDecoder.decode();
+        ExtFile libraryDir = new ExtFile(libraryApk + ".out");
+        new ApkDecoder(libraryApk, sConfig).decode(libraryDir);
 
         // build client.apk
-        ExtFile clientApk = new ExtFile(sTmpDir, client + ".out");
-        new Androlib(buildOptions).build(clientApk, null);
-        assertTrue(fileExists(client + ".out" + File.separator + "dist" + File.separator + client));
+        new ApkBuilder(clientDir, sConfig).build(null);
+
+        assertTrue(new File(clientDir, "dist/" + clientApk.getName()).exists());
 
         // build library.apk (shared library)
-        ExtFile libraryApk = new ExtFile(sTmpDir, library + ".out");
-        new Androlib(buildOptions).build(libraryApk, null);
-        assertTrue(fileExists(library + ".out" + File.separator + "dist" + File.separator + library));
-    }
+        new ApkBuilder(libraryDir, sConfig).build(null);
 
-    private boolean fileExists(String filepath) {
-        return Files.exists(Paths.get(sTmpDir.getAbsolutePath() + File.separator + filepath));
+        assertTrue(new File(libraryDir, "dist/" + libraryApk.getName()).exists());
     }
 }

@@ -17,24 +17,22 @@
 package brut.androlib.res.data.value;
 
 import android.util.TypedValue;
-import brut.androlib.AndrolibException;
+import brut.androlib.exceptions.AndrolibException;
 import brut.androlib.res.data.ResPackage;
 import brut.androlib.res.data.ResTypeSpec;
-import brut.util.Duo;
+import org.apache.commons.lang3.tuple.Pair;
 
 public class ResValueFactory {
     private final ResPackage mPackage;
 
-    public ResValueFactory(ResPackage package_) {
-        this.mPackage = package_;
+    public ResValueFactory(ResPackage pkg) {
+        mPackage = pkg;
     }
 
     public ResScalarValue factory(int type, int value, String rawValue) throws AndrolibException {
         switch (type) {
             case TypedValue.TYPE_NULL:
-                if (value == TypedValue.DATA_NULL_UNDEFINED) { // Special case $empty as explicitly defined empty value
-                    return new ResStringValue(null, value);
-                } else if (value == TypedValue.DATA_NULL_EMPTY) {
+                if (value == TypedValue.DATA_NULL_EMPTY) {
                     return new ResEmptyValue(value, rawValue, type);
                 }
                 return new ResReferenceValue(mPackage, 0, null);
@@ -80,46 +78,36 @@ public class ResValueFactory {
         return new ResStringValue(value, rawValue);
     }
 
-    public ResBagValue bagFactory(int parent, Duo<Integer, ResScalarValue>[] items, ResTypeSpec resTypeSpec) throws AndrolibException {
-        ResReferenceValue parentVal = newReference(parent, null);
+    public ResBagValue bagFactory(int parentId, Pair<Integer, ResScalarValue>[] items, ResTypeSpec resTypeSpec)
+            throws AndrolibException {
+        ResReferenceValue parent = newReference(parentId, null);
 
         if (items.length == 0) {
-            return new ResBagValue(parentVal);
+            return new ResBagValue(parent);
         }
-        int key = items[0].m1;
-        if (key == ResAttr.BAG_KEY_ATTR_TYPE) {
-            return ResAttr.factory(parentVal, items, this, mPackage);
-        }
-
         String resTypeName = resTypeSpec.getName();
 
-        // Android O Preview added an unknown enum for c. This is hardcoded as 0 for now.
-        if (ResTypeSpec.RES_TYPE_NAME_ARRAY.equals(resTypeName)
-                || key == ResArrayValue.BAG_KEY_ARRAY_START || key == 0) {
-            return new ResArrayValue(parentVal, items);
+        switch (resTypeName) {
+            case ResTypeSpec.RES_TYPE_NAME_ATTR:
+            case ResTypeSpec.RES_TYPE_NAME_ATTR_PRIVATE:
+                return ResAttr.factory(parent, items, this);
+            case ResTypeSpec.RES_TYPE_NAME_ARRAY:
+                return new ResArrayValue(parent, items);
+            case ResTypeSpec.RES_TYPE_NAME_PLURALS:
+                return new ResPluralsValue(parent, items);
+            default:
+                if (resTypeName.startsWith(ResTypeSpec.RES_TYPE_NAME_STYLES)) {
+                    return new ResStyleValue(parent, items, this);
+                }
+                throw new AndrolibException("unsupported res type name for bags. Found: " + resTypeName);
         }
-
-        if (ResTypeSpec.RES_TYPE_NAME_PLURALS.equals(resTypeName) ||
-                (key >= ResPluralsValue.BAG_KEY_PLURALS_START && key <= ResPluralsValue.BAG_KEY_PLURALS_END)) {
-            return new ResPluralsValue(parentVal, items);
-        }
-
-        if (ResTypeSpec.RES_TYPE_NAME_STYLES.equals(resTypeName)) {
-            return new ResStyleValue(parentVal, items, this);
-        }
-
-        if (ResTypeSpec.RES_TYPE_NAME_ATTR.equals(resTypeName)) {
-            return new ResAttr(parentVal, 0, null, null, null);
-        }
-
-        throw new AndrolibException("unsupported res type name for bags. Found: " + resTypeName);
     }
 
-    public ResReferenceValue newReference(int resID, String rawValue) {
-        return newReference(resID, rawValue, false);
+    public ResReferenceValue newReference(int resId, String rawValue) {
+        return newReference(resId, rawValue, false);
     }
 
-    public ResReferenceValue newReference(int resID, String rawValue, boolean theme) {
-        return new ResReferenceValue(mPackage, resID, rawValue, theme);
+    public ResReferenceValue newReference(int resId, String rawValue, boolean theme) {
+        return new ResReferenceValue(mPackage, resId, rawValue, theme);
     }
 }

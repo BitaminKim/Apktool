@@ -16,32 +16,26 @@
  */
 package brut.androlib.res.data;
 
-import brut.androlib.AndrolibException;
-import brut.androlib.err.UndefinedResObjectException;
+import brut.androlib.exceptions.AndrolibException;
+import brut.androlib.exceptions.UndefinedResObjectException;
 import java.util.*;
 
 public final class ResTypeSpec {
-
     public static final String RES_TYPE_NAME_ARRAY = "array";
-    public static final String RES_TYPE_NAME_PLURALS = "plurals";
-    public static final String RES_TYPE_NAME_STYLES = "style";
     public static final String RES_TYPE_NAME_ATTR = "attr";
+    public static final String RES_TYPE_NAME_ATTR_PRIVATE = "^attr-private";
+    public static final String RES_TYPE_NAME_PLURALS = "plurals";
+    public static final String RES_TYPE_NAME_STRING = "string";
+    public static final String RES_TYPE_NAME_STYLES = "style";
 
     private final String mName;
-    private final Map<String, ResResSpec> mResSpecs = new LinkedHashMap<>();
-
-    private final ResTable mResTable;
-    private final ResPackage mPackage;
-
     private final int mId;
-    private final int mEntryCount;
+    private final Map<String, ResResSpec> mResSpecs;
 
-    public ResTypeSpec(String name, ResTable resTable, ResPackage package_, int id, int entryCount) {
-        this.mName = name;
-        this.mResTable = resTable;
-        this.mPackage = package_;
-        this.mId = id;
-        this.mEntryCount = entryCount;
+    public ResTypeSpec(String name, int id) {
+        mName = name;
+        mId = id;
+        mResSpecs = new LinkedHashMap<>();
     }
 
     public String getName() {
@@ -53,7 +47,7 @@ public final class ResTypeSpec {
     }
 
     public boolean isString() {
-        return mName.equalsIgnoreCase("string");
+        return mName.equals(RES_TYPE_NAME_STRING);
     }
 
     public ResResSpec getResSpec(String name) throws AndrolibException {
@@ -66,10 +60,6 @@ public final class ResTypeSpec {
 
     public ResResSpec getResSpecUnsafe(String name) {
         return mResSpecs.get(name);
-    }
-
-    public void removeResSpec(ResResSpec spec) {
-        mResSpecs.remove(spec.getName());
     }
 
     public void addResSpec(ResResSpec spec) throws AndrolibException {
